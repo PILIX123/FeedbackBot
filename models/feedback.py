@@ -1,6 +1,8 @@
 from discord import Message, User, Member
+from discord.threads import Thread
+from discord.channel import TextChannel, VoiceChannel, StageChannel, DMChannel, PartialMessageable, GroupChannel
 from datetime import datetime
-from typing import Any
+from typing import Any, Union
 
 
 class Feedback:
@@ -9,7 +11,8 @@ class Feedback:
     content: str
     date: datetime
     url: str
-    channel: Any
+    channel: Union[TextChannel, VoiceChannel, StageChannel,
+                   Thread, DMChannel, PartialMessageable, GroupChannel]
     blank: str = ""
     discord: str = "Discord"
     author_id: int
@@ -22,3 +25,22 @@ class Feedback:
         self.url = message.jump_url
         self.channel = message.channel
         self.author_id = message.author.id
+
+
+class ConnectionCheck:
+    author: User | Member
+    of_the_show: str
+    previous_connection: str
+    next_connection: str
+    status: str
+
+    def __init__(self, previous_connection: str, status: str, next_connection: str, of_the_show: str | None, author: User | Member):
+        self.author = author
+        self.next_connection = next_connection
+        self.previous_connection = previous_connection
+        self.status = status
+        if of_the_show is not None:
+            self.of_the_show = of_the_show
+
+    def __str__(self) -> str:
+        return f":conduit: Connection Check: {self.status} {self.previous_connection}\n\nNew Connection: {self.next_connection}"
