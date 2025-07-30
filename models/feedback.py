@@ -3,6 +3,7 @@ from discord.threads import Thread
 from discord.channel import TextChannel, VoiceChannel, StageChannel, DMChannel, PartialMessageable, GroupChannel
 from datetime import datetime
 from typing import Any, Union
+import json
 
 
 class Feedback:
@@ -44,3 +45,24 @@ class ConnectionCheck:
 
     def __str__(self) -> str:
         return f":conduit: Connection Check: {self.status} {self.previous_connection}\n\nNew Connection: {self.next_connection}"
+
+
+class StJudeVariables:
+    vanity = "+relay-for-st-jude"
+    slug: str
+
+    def __init__(self, slug: str):
+        self.slug = slug
+
+
+class StJudeCall:
+    operationName: str = "get_team_event_by_vanity_and_slug"
+    variables: StJudeVariables
+    query: str = "query get_team_event_by_vanity_and_slug($vanity: String!, $slug: String!) {teamEvent(vanity: $vanity, slug: $slug) {totalAmountRaised {currency value} goal {currency value}}}"
+
+    def __init__(self, slug: str):
+        self.variables = StJudeVariables(slug)
+
+    def toDict(self):
+        return {'operationName': self.operationName, 'variables': {
+            'vanity': self.variables.vanity, 'slug': self.variables.slug}, 'query': self.query}
