@@ -1,12 +1,18 @@
-from models.feedback import Feedback, ConnectionCheck, StJudeCall
+from models.feedback import Feedback, ConnectionCheck, StJudeCall, FeedbackForm
 from utils.utils import progressBar
-from discord import Intents, app_commands, Client, Interaction, InteractionMessage, Permissions, Embed, ForumChannel, CategoryChannel
-from discord.app_commands import CommandTree
+from discord import Intents, app_commands, Client, Interaction, InteractionMessage, Permissions, Embed,  Activity, ActivityType
+from discord.app_commands import CommandTree, AppCommandError, CommandInvokeError
 from dotenv import load_dotenv
 import os
 import json
 import requests
 from requests import Response
+import aiohttp
+from typing import Any
+from bs4 import BeautifulSoup
+from bs4.element import NavigableString, PageElement, Tag
+import re
+
 
 load_dotenv()
 intents: Intents = Intents.default()
@@ -17,14 +23,36 @@ tree: CommandTree[Client] = app_commands.CommandTree(client)
 
 test: str = ":brook:1237150453691711590"
 thumbs_up: str = '👍'
+error_emote: str = "🚫"
 st_jude_emote: str = "stjude:739880520703541268"
 admin_mods_perms = Permissions()
 admin_mods_perms.administrator = True
 admin_mods_perms.moderate_members = True
+st_jude_slug: str = 'relay-for-st-jude-2024'
+embed_url: str = "https://s3.amazonaws.com/relayfm/assets/Square-Campaign-URL-2024.png"
+
+client.on_error
 
 
 @tree.command(name="connection_check", description="Log a connection check for the conduit podcast")
 async def connection_check(interaction: Interaction, previous_connection: str, status: str, next_connection: str, of_the_show_name: str | None):
+    info: BeautifulSoup
+    async with aiohttp.ClientSession() as session:
+        async with session.get("https://www.relay.fm/conduit/feedback") as r:
+            info = BeautifulSoup(await r.text())
+
+    form = info.find('form', id="edit_broadcast")
+    if form is not None and isinstance(form, Tag):
+        inputs = form.find_all("input")
+        feedbackFrom = FeedbackForm()
+        for input in inputs:
+            if isinstance(input, Tag) and isinstance(input.attrs.get("id"), str) and str(input.attrs.get("id")).startswith("broadcast_feedbacks_attribute"):
+                (num, field) = str(input.attrs.get("id")).removeprefix(
+                    "broadcast_feedbacks_attributes_").split("_")
+                i = 0
+                feedbackFrom.x = int(num)
+                feedbackFrom.__setattr__(field, str(input.attrs.get("value")))
+
     connection: ConnectionCheck = ConnectionCheck(
         previous_connection, status, next_connection, of_the_show_name, interaction.user)
     response = await interaction.response.send_message(str(connection))
@@ -42,7 +70,35 @@ async def backstage(interaction: Interaction, question: str):
         await response.resource.add_reaction(test)
     # TODO Add to form
 
-st_jude_slug: str = 'relay-for-st-jude-2024'
+
+@tree.error
+async def on_error(interaction: Interaction, error: AppCommandError, /):
+    if isinstance(error, CommandInvokeError):
+        # TODO Add logger
+        error.command.qualified_name
+        error.original
+    if interaction.response.is_done():
+        mess = await interaction.original_response()
+        await mess.add_reaction(error_emote)
+    else:
+        if interaction.command is not None:
+            await interaction.response.send_message(f"There was an error executing the {interaction.command.qualified_name} command")
+        else:
+            await interaction.response.send_message("There was an error with the interaction")
+
+
+@tree.command(name="ask_upgrade", description="Submit a question for Jason and Myke to maybe answer on the podcast")
+async def ask_upgrade(interaction: Interaction, question: str, anonymous: bool = False):
+    raise Exception("hi")
+    await interaction.response.send_message(content=f"Question", ephemeral=anonymous)
+
+
+@tree.command(name="set_embed_image", description="Sets this years image for the st-jude campain embed")
+@app_commands.default_permissions(admin_mods_perms)
+async def set_embed_url(interaction: Interaction, image_url: str):
+    global embed_url
+    embed_url = image_url
+    await interaction.response.send_message(f"This year's St. Jude embed image has been set to {image_url}")
 
 
 @tree.command(name="set_st_jude_slug", description="Sets the st-jude event slug")
@@ -56,12 +112,15 @@ async def set_slug(interaction: Interaction, slug: str):
 @tree.command(name="donate", description="Donate to St-Jude")
 @app_commands.default_permissions(admin_mods_perms)
 async def donate(interaction: Interaction):
-    # await interaction.response.defer()
     headers = {"content-type": "application/json", "accept": "*/*"}
     call = StJudeCall(st_jude_slug)
-    r: Response = requests.post("https://api.tiltify.com",
-                                json=call.toDict(), headers=headers)
-    info = r.json()
+
+    info: dict
+    async with aiohttp.ClientSession() as session:
+        async with session.post("https://api.tiltify.com",
+                                json=call.toDict(), headers=headers) as r:
+            info = await r.json()
+
     raised: float = float(info["data"]["teamEvent"]
                           ["totalAmountRaised"]["value"])
     goal: float = float(info["data"]["teamEvent"]["goal"]["value"])
@@ -72,7 +131,7 @@ async def donate(interaction: Interaction):
         color=0xffcc33
     )
     embed.set_thumbnail(
-        url="https://s3.amazonaws.com/relayfm/assets/Square-Campaign-URL-2024.png")
+        url=embed_url)
     embed.add_field(name="Currently Raised:",
                     value=f"${raised:,.2f}", inline=False)
     embed.add_field(name="Fundraising Target:",
@@ -80,17 +139,15 @@ async def donate(interaction: Interaction):
     embed.add_field(name="Progress:",
                     value=f"{round(raised/goal*100, 2)}%", inline=False)
     embed.set_footer(text=progressBar(raised, goal))
-    mess = await interaction.response.send_message(embed=embed)
-    await interaction.followup.send("<https://www.stjude.org/relay>")
+    mess = await interaction.response.send_message(content="<https://www.stjude.org/relay>", embed=embed)
     if isinstance(mess.resource, InteractionMessage):
-        # mess = await interaction.channel.send("<https://www.stjude.org/relay>")
         await mess.resource.add_reaction(test)
 
 
 @client.event
 async def on_ready():
     await tree.sync()
-    a = 0
+    await client.change_presence(activity=Activity(type=ActivityType.watching, name="for feedback"))
 
 
 token = os.getenv("token")

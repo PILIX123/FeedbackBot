@@ -59,6 +59,7 @@ class StJudeCall:
     operationName: str = "get_team_event_by_vanity_and_slug"
     variables: StJudeVariables
     query: str = "query get_team_event_by_vanity_and_slug($vanity: String!, $slug: String!) {teamEvent(vanity: $vanity, slug: $slug) {totalAmountRaised {currency value} goal {currency value}}}"
+    embed_image_url: str
 
     def __init__(self, slug: str):
         self.variables = StJudeVariables(slug)
@@ -66,3 +67,18 @@ class StJudeCall:
     def toDict(self):
         return {'operationName': self.operationName, 'variables': {
             'vanity': self.variables.vanity, 'slug': self.variables.slug}, 'query': self.query}
+
+
+class FeedbackForm:
+    utf8: str = "✓"
+    _method: str = "put"
+    name: str
+    pronouns: str
+    email: str
+    text: str
+    anonymous: str
+    archived: str | bool = False
+    x: int
+    gibberish: str
+    spinner: str
+    commit: str = "Submit"
