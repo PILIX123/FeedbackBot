@@ -1,18 +1,24 @@
-from models.feedback import Feedback, ConnectionCheck, StJudeCall, FeedbackForm
-from utils.utils import progressBar
-from discord import Intents, app_commands, Client, Interaction, InteractionMessage, Permissions, Embed,  Activity, ActivityType
-from discord.app_commands import CommandTree, AppCommandError, CommandInvokeError
-from dotenv import load_dotenv
-import os
 import json
-import requests
-from requests import Response
-import aiohttp
+import os
+import re
+from types import SimpleNamespace
 from typing import Any
+
+import aiohttp
+import requests
 from bs4 import BeautifulSoup
 from bs4.element import NavigableString, PageElement, Tag
-import re
+from discord import (Activity, ActivityType, Client, Embed, Intents,
+                     Interaction, InteractionMessage, Permissions,
+                     app_commands)
+from discord.app_commands import (AppCommandError, CommandInvokeError,
+                                  CommandTree)
+from dotenv import load_dotenv
+from requests import Response
 
+from models.feedback import ConnectionCheck, Feedback, FeedbackForm, StJudeCall
+from models.tiltify import FullCampaign
+from utils.utils import progressBar
 
 load_dotenv()
 intents: Intents = Intents.default()
@@ -28,8 +34,11 @@ st_jude_emote: str = "stjude:739880520703541268"
 admin_mods_perms = Permissions()
 admin_mods_perms.administrator = True
 admin_mods_perms.moderate_members = True
-st_jude_slug: str = 'relay-for-st-jude-2024'
-embed_url: str = "https://s3.amazonaws.com/relayfm/assets/Square-Campaign-URL-2024.png"
+st_jude_slug: str = 'relay-for-st-jude-2025'
+embed_url: str = "https://s3.amazonaws.com/relayfm/assets/Square-Campaign-URL-2025.png"
+client_id: str | None = os.getenv("tildify_client_id")
+client_secret: str | None = os.getenv("tildify_client_secret")
+fundraising_id: str | None = os.getenv("fundraising_id")
 
 client.on_error
 
@@ -102,7 +111,7 @@ async def set_embed_url(interaction: Interaction, image_url: str):
 
 
 @tree.command(name="set_st_jude_slug", description="Sets the st-jude event slug")
-@app_commands.default_permissions(admin_mods_perms)
+# @app_commands.default_permissions(admin_mods_perms)
 async def set_slug(interaction: Interaction, slug: str):
     global st_jude_slug
     st_jude_slug = slug
@@ -110,20 +119,33 @@ async def set_slug(interaction: Interaction, slug: str):
 
 
 @tree.command(name="donate", description="Donate to St-Jude")
-@app_commands.default_permissions(admin_mods_perms)
+# @app_commands.default_permissions(admin_mods_perms)
 async def donate(interaction: Interaction):
-    headers = {"content-type": "application/json", "accept": "*/*"}
+    await interaction.response.defer()
+    headers = {"Content-Type": "application/json",
+               }
     call = StJudeCall(st_jude_slug)
 
     info: dict
+    campain: FullCampaign
     async with aiohttp.ClientSession() as session:
-        async with session.post("https://api.tiltify.com",
-                                json=call.toDict(), headers=headers) as r:
+        data: dict = {"client_id": f"{client_id}", "client_secret": f"{client_secret}",
+                      "grant_type": "client_credentials", "scope": "public"}
+        async with session.post(f"https://v5api.tiltify.com/oauth/token", json=data, headers=headers) as r:
             info = await r.json()
+            headers.update(
+                {"Authorization": f"Bearer {info.get("access_token")}"})
+        async with session.get(f"https://v5api.tiltify.com/api/public/fundraising_events/{fundraising_id}",
+                               headers=headers) as r:
+            data = await r.json()
+            if data.get("data") is not None:
+                actual_data: dict[Any, Any] = data.get("data")  # type:ignore
+                campain = FullCampaign(**actual_data)
+            else:
+                raise Exception("Campain info wasnt querried properly")
 
-    raised: float = float(info["data"]["teamEvent"]
-                          ["totalAmountRaised"]["value"])
-    goal: float = float(info["data"]["teamEvent"]["goal"]["value"])
+    raised: float = float(campain.total_amount_raised.value)
+    goal: float = float(campain.goal.value)
     embed = Embed(
         title="Donate to St. Jude!",
         url="https://www.stjude.org/relay",
@@ -139,9 +161,9 @@ async def donate(interaction: Interaction):
     embed.add_field(name="Progress:",
                     value=f"{round(raised/goal*100, 2)}%", inline=False)
     embed.set_footer(text=progressBar(raised, goal))
-    mess = await interaction.response.send_message(content="<https://www.stjude.org/relay>", embed=embed)
-    if isinstance(mess.resource, InteractionMessage):
-        await mess.resource.add_reaction(test)
+    mess = await interaction.edit_original_response(content="<https://www.stjude.org/relay>", embed=embed)
+    if isinstance(mess, InteractionMessage):
+        await mess.add_reaction(test)
 
 
 @client.event
