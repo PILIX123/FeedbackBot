@@ -1,9 +1,11 @@
-from discord import Message, User, Member
-from discord.threads import Thread
-from discord.channel import TextChannel, VoiceChannel, StageChannel, DMChannel, PartialMessageable, GroupChannel
+import json
 from datetime import datetime
 from typing import Any, Union
-import json
+
+from discord import Member, Message, User
+from discord.channel import (DMChannel, GroupChannel, PartialMessageable,
+                             StageChannel, TextChannel, VoiceChannel)
+from discord.threads import Thread
 
 
 class Feedback:
@@ -44,7 +46,7 @@ class ConnectionCheck:
             self.of_the_show = of_the_show
 
     def __str__(self) -> str:
-        return f":conduit: Connection Check: {self.status} {self.previous_connection}\n\nNew Connection: {self.next_connection}"
+        return f"Connection Check: {self.status} {self.previous_connection}\n\nNew Connection: {self.next_connection}"
 
 
 class StJudeVariables:
@@ -73,8 +75,8 @@ class FeedbackForm:
     utf8: str = "✓"
     _method: str = "put"
     name: str
-    pronouns: str
-    email: str
+    pronouns: str | None
+    email: str | None
     text: str
     anonymous: str
     archived: str | bool = False
@@ -82,3 +84,24 @@ class FeedbackForm:
     gibberish: str
     spinner: str
     commit: str = "Submit"
+
+    def update(self, connection: ConnectionCheck) -> None:
+        self.name = connection.author.name
+        self.text = str(connection)
+        self.anonymous = "0"
+
+    def to_dict(self) -> dict:
+        payload: dict = dict()
+        payload.update({"utf8": self.utf8})
+        payload.update({"_method": self._method})
+        broadcastStr: str = f"broadcast[feedbacks_attributes][{self.x}]"
+        payload.update({f"{broadcastStr}[name]": self.name})
+        payload.update({f"{broadcastStr}[pronouns]": self.pronouns})
+        payload.update({f"{broadcastStr}[email]": self.email})
+        payload.update({f"{broadcastStr}[text]": self.text})
+        payload.update({f"{broadcastStr}[anonymous]": self.anonymous})
+        payload.update({f"{broadcastStr}[archived]": self.archived})
+        payload.update({f"{self.gibberish}": ""})
+        payload.update({"spinner": self.spinner})
+        payload.update({"commit": self.commit})
+        return payload
