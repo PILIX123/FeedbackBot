@@ -1,3 +1,4 @@
+import http.cookies
 import json
 import os
 import re
@@ -47,8 +48,10 @@ client.on_error
 async def connection_check(interaction: Interaction, previous_connection: str, status: str, next_connection: str, of_the_show_name: str | None):
     await interaction.response.defer()
     info: BeautifulSoup
+    cookies: http.cookies.SimpleCookie
     async with aiohttp.ClientSession() as session:
         async with session.get("https://www.relay.fm/conduit/feedback") as r:
+            cookies = r.cookies
             info = BeautifulSoup(await r.text(), features="html.parser")
 
     feedbackFrom = FeedbackForm()
@@ -66,17 +69,34 @@ async def connection_check(interaction: Interaction, previous_connection: str, s
                 feedbackFrom.gibberish = str(input.attrs.get("id"))
             if isinstance(input, Tag) and isinstance(input.attrs.get("name"), str) and str(input.attrs.get("name")) == "spinner" and isinstance(input.attrs.get("value"), str):
                 feedbackFrom.spinner = str(input.attrs.get("value"))
-
+    cookieVal: str = ''
+    tempMorsel = cookies.get("_neon_cms_session")
+    if tempMorsel is not None:
+        cookieVal = tempMorsel.value
     header: dict = {"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
                     "Accept-Encoding": "gzip, deflate, br, zstd",
                     "Accept-Language": "en-US,en;q=0.5",
-                    "Content-Type": "application/x-www-form-urlencoded"}
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Host": "www.relay.fm",
+                    "TE": "trailers",
+                    "Priority": "u=0, i",
+                    "Referer": "https://www.relay.fm/conduit/feedback",
+                    "Origin": "https://www.relay.fm",
+                    "Sec-Fetch-Dest": "document",
+                    "Sec-Fetch-Mode": "navigate",
+                    "Sec-Fetch-Site": "same-origin",
+                    "Sec-Fetch-User": "?1",
+                    "Upgrade-Insecure-Requests": "1",
+                    "Cookie": f"_neon_cms_session={cookieVal}"}
     connection: ConnectionCheck = ConnectionCheck(
         previous_connection, status, next_connection, of_the_show_name, interaction.user)
     feedbackFrom.update(connection)
     testFeedback = feedbackFrom.to_dict()
     sentRequest = requests.post("https://www.relay.fm/shows/conduit/update?id=conduit",
-                                data=testFeedback, headers=header)
+                                data=testFeedback, headers=header, cookies={"_neon_cms_session": cookieVal})
+    # a = sentRequest.prepare()
+    # with open("test.bin", "wb") as f:
+    #     f.write(sentRequest.content)
     response = await interaction.edit_original_response(content=f":conduit: {str(connection)}")
     if not sentRequest.ok:
         raise RuntimeError("Couldnt be sent to feedback form")
