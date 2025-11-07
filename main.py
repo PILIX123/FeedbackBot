@@ -44,10 +44,8 @@ async def connection_check(interaction: Interaction, previous_connection: str, s
         previous_connection, status, next_connection, of_the_show_name, interaction.user)
 
     form = WebForm("https://www.relay.fm/conduit/feedback", connection)
-
-    await form.update_bs_cookies()
-
     success = await form.submit_form("https://www.relay.fm/shows/conduit/update?id=conduit")
+
     response = await interaction.edit_original_response(content=f"{conduit} {str(connection)}")
     if not success:
         raise RuntimeError("Couldnt be sent to feedback form")

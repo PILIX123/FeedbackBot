@@ -96,17 +96,24 @@ class WebForm:
     _info: BeautifulSoup
     _cookies: SimpleCookie
     _form: FeedbackForm
-    url: str
-    discordFeedback: DiscordFeedback
+    _url: str
+    _discordFeedback: DiscordFeedback
     _cookieVal: dict[str, str] = {"_neon_cms_session": ''}
 
     def __init__(self, url: str, discordFeedback: DiscordFeedback) -> None:
-        self.url = url
-        self.discordFeedback = discordFeedback
+        self._url = url
+        self._discordFeedback = discordFeedback
 
-    async def update_bs_cookies(self):
+    async def submit_form(self, url: str) -> bool:
+        await self._update_bs_cookies()
+        self._generate_feedback_form()
         async with aiohttp.ClientSession() as session:
-            async with session.get(self.url) as r:
+            async with session.post(url, data=self.feedbackForm.to_dict(), headers=self._generate_headers(), cookies=self._cookieVal) as r:
+                return r.ok
+
+    async def _update_bs_cookies(self):
+        async with aiohttp.ClientSession() as session:
+            async with session.get(self._url) as r:
                 self._cookies = r.cookies
                 self._info = BeautifulSoup(await r.text(), features="html.parser")
 
@@ -127,7 +134,7 @@ class WebForm:
                 if isinstance(input, Tag) and isinstance(input.attrs.get("name"), str) and str(input.attrs.get("name")) == "spinner" and isinstance(input.attrs.get("value"), str):
                     self.feedbackForm.spinner = str(input.attrs.get("value"))
 
-        self.feedbackForm.update(self.discordFeedback)
+        self.feedbackForm.update(self._discordFeedback)
 
     def _generate_headers(self) -> dict[str, str]:
         tempmorsel = self._cookies.get("_neon_cms_session")
@@ -150,9 +157,3 @@ class WebForm:
                         "Cookie": f"_neon_cms_session={self._cookieVal}"}
 
         return header
-
-    async def submit_form(self, url: str) -> bool:
-        self._generate_feedback_form()
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, data=self.feedbackForm.to_dict(), headers=self._generate_headers(), cookies=self._cookieVal) as r:
-                return r.ok
