@@ -1,6 +1,5 @@
-import json
-from datetime import datetime
-from typing import Any, Union
+from http import cookies
+from bs4.element import NavigableString, PageElement, Tag
 
 from discord import Member, Message, User
 from discord.channel import (DMChannel, GroupChannel, PartialMessageable,
@@ -8,29 +7,22 @@ from discord.channel import (DMChannel, GroupChannel, PartialMessageable,
 from discord.threads import Thread
 
 
-class Feedback:
+from bs4 import BeautifulSoup
+
+from http.cookies import SimpleCookie
+import aiohttp
+
+
+class DiscordFeedback:
     author: User | Member
-    author_name: str
-    content: str
-    date: datetime
-    url: str
-    channel: Union[TextChannel, VoiceChannel, StageChannel,
-                   Thread, DMChannel, PartialMessageable, GroupChannel]
-    blank: str = ""
-    discord: str = "Discord"
-    author_id: int
+    anon: bool
 
-    def __init__(self, message: Message):
-        self.author = message.author
-        self.author_name = message.author.display_name
-        self.content = message.content
-        self.date = message.created_at
-        self.url = message.jump_url
-        self.channel = message.channel
-        self.author_id = message.author.id
+    def __init__(self, author: User | Member, anonymous: bool = False) -> None:
+        self.author = author
+        self.anon = anonymous
 
 
-class ConnectionCheck:
+class ConnectionCheck(DiscordFeedback):
     author: User | Member
     of_the_show: str
     previous_connection: str
@@ -38,7 +30,7 @@ class ConnectionCheck:
     status: str
 
     def __init__(self, previous_connection: str, status: str, next_connection: str, of_the_show: str | None, author: User | Member):
-        self.author = author
+        super().__init__(author)
         self.next_connection = next_connection
         self.previous_connection = previous_connection
         self.status = status
@@ -85,10 +77,10 @@ class FeedbackForm:
     spinner: str
     commit: str = "Submit"
 
-    def update(self, connection: ConnectionCheck) -> None:
-        self.name = connection.author.name
-        self.text = str(connection)
-        self.anonymous = "0"
+    def update(self, feedback: DiscordFeedback) -> None:
+        self.name = feedback.author.name
+        self.text = str(feedback)
+        self.anonymous = "1" if feedback.anon else "0"
 
     def to_dict(self) -> dict:
         payload: dict = dict()
@@ -105,3 +97,69 @@ class FeedbackForm:
         payload.update({"spinner": self.spinner})
         payload.update({"commit": self.commit})
         return payload
+
+
+class WebForm:
+    _info: BeautifulSoup
+    _cookies: SimpleCookie
+    _form: FeedbackForm
+    url: str
+    discordFeedback: DiscordFeedback
+    _cookieVal: dict[str, str] = {"_neon_cms_session": ''}
+
+    def __init__(self, url: str, discordFeedback: DiscordFeedback) -> None:
+        self.url = url
+        self.discordFeedback = discordFeedback
+
+    async def update_bs_cookies(self):
+        async with aiohttp.ClientSession() as session:
+            async with session.get(self.url) as r:
+                self._cookies = r.cookies
+                self._info = BeautifulSoup(await r.text(), features="html.parser")
+
+    def _generate_feedback_form(self):
+        self.feedbackForm = FeedbackForm()
+        form = self._info.find('form', id="edit_broadcast")
+        if form is not None and isinstance(form, Tag):
+            inputs = form.find_all("input")
+            for input in inputs:
+                if isinstance(input, Tag) and isinstance(input.attrs.get("id"), str) and str(input.attrs.get("id")).startswith("broadcast_feedbacks_attribute"):
+                    (num, field) = str(input.attrs.get("id")).removeprefix(
+                        "broadcast_feedbacks_attributes_").split("_")
+                    self.feedbackForm.x = int(num)
+                    self.feedbackForm.__setattr__(field, str(
+                        input.attrs.get("value") or ""))
+                if isinstance(input, Tag) and isinstance(input.attrs.get("tabindex"), str) and str(input.attrs.get("tabindex")) == "-1":
+                    self.feedbackForm.gibberish = str(input.attrs.get("id"))
+                if isinstance(input, Tag) and isinstance(input.attrs.get("name"), str) and str(input.attrs.get("name")) == "spinner" and isinstance(input.attrs.get("value"), str):
+                    self.feedbackForm.spinner = str(input.attrs.get("value"))
+
+        self.feedbackForm.update(self.discordFeedback)
+
+    def _generate_headers(self) -> dict[str, str]:
+        tempmorsel = self._cookies.get("_neon_cms_session")
+        if tempmorsel is not None:
+            self._cookieVal.update({"_neon_cms_session": tempmorsel.value})
+        header: dict = {"accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                        "accept-encoding": "gzip, deflate, br, zstd",
+                        "accept-language": "en-us,en;q=0.5",
+                        "content-type": "application/x-www-form-urlencoded",
+                        "host": "www.relay.fm",
+                        "te": "trailers",
+                        "priority": "u=0, i",
+                        "referer": "https://www.relay.fm/conduit/feedback",
+                        "origin": "https://www.relay.fm",
+                        "sec-fetch-dest": "document",
+                        "sec-fetch-mode": "navigate",
+                        "sec-fetch-site": "same-origin",
+                        "sec-fetch-user": "?1",
+                        "Upgrade-Insecure-Requests": "1",
+                        "Cookie": f"_neon_cms_session={self._cookieVal}"}
+
+        return header
+
+    async def submit_form(self, url: str) -> bool:
+        self._generate_feedback_form()
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, data=self.feedbackForm.to_dict(), headers=self._generate_headers(), cookies=self._cookieVal) as r:
+                return r.ok

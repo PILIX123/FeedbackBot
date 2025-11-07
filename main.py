@@ -1,14 +1,8 @@
-import http.cookies
-import json
 import os
-import re
-from types import SimpleNamespace
 from typing import Any
 
 import aiohttp
 import requests
-from bs4 import BeautifulSoup
-from bs4.element import NavigableString, PageElement, Tag
 from discord import (Activity, ActivityType, Client, Embed, Intents,
                      Interaction, InteractionMessage, Permissions,
                      app_commands)
@@ -17,7 +11,7 @@ from discord.app_commands import (AppCommandError, CommandInvokeError,
 from dotenv import load_dotenv
 from requests import Response
 
-from models.feedback import ConnectionCheck, Feedback, FeedbackForm, StJudeCall
+from models.feedback import ConnectionCheck, FeedbackForm, StJudeCall, WebForm
 from models.tiltify import FullCampaign
 from utils.utils import progressBar
 
@@ -41,64 +35,21 @@ client_id: str | None = os.getenv("tildify_client_id")
 client_secret: str | None = os.getenv("tildify_client_secret")
 fundraising_id: str | None = os.getenv("fundraising_id")
 
-client.on_error
-
 
 @tree.command(name="connection_check", description="Log a connection check for the conduit podcast")
 async def connection_check(interaction: Interaction, previous_connection: str, status: str, next_connection: str, of_the_show_name: str | None):
     await interaction.response.defer()
-    info: BeautifulSoup
-    cookies: http.cookies.SimpleCookie
-    async with aiohttp.ClientSession() as session:
-        async with session.get("https://www.relay.fm/conduit/feedback") as r:
-            cookies = r.cookies
-            info = BeautifulSoup(await r.text(), features="html.parser")
 
-    feedbackFrom = FeedbackForm()
-    form = info.find('form', id="edit_broadcast")
-    if form is not None and isinstance(form, Tag):
-        inputs = form.find_all("input")
-        for input in inputs:
-            if isinstance(input, Tag) and isinstance(input.attrs.get("id"), str) and str(input.attrs.get("id")).startswith("broadcast_feedbacks_attribute"):
-                (num, field) = str(input.attrs.get("id")).removeprefix(
-                    "broadcast_feedbacks_attributes_").split("_")
-                feedbackFrom.x = int(num)
-                feedbackFrom.__setattr__(field, str(
-                    input.attrs.get("value") or ""))
-            if isinstance(input, Tag) and isinstance(input.attrs.get("tabindex"), str) and str(input.attrs.get("tabindex")) == "-1":
-                feedbackFrom.gibberish = str(input.attrs.get("id"))
-            if isinstance(input, Tag) and isinstance(input.attrs.get("name"), str) and str(input.attrs.get("name")) == "spinner" and isinstance(input.attrs.get("value"), str):
-                feedbackFrom.spinner = str(input.attrs.get("value"))
-    cookieVal: str = ''
-    tempMorsel = cookies.get("_neon_cms_session")
-    if tempMorsel is not None:
-        cookieVal = tempMorsel.value
-    header: dict = {"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                    "Accept-Encoding": "gzip, deflate, br, zstd",
-                    "Accept-Language": "en-US,en;q=0.5",
-                    "Content-Type": "application/x-www-form-urlencoded",
-                    "Host": "www.relay.fm",
-                    "TE": "trailers",
-                    "Priority": "u=0, i",
-                    "Referer": "https://www.relay.fm/conduit/feedback",
-                    "Origin": "https://www.relay.fm",
-                    "Sec-Fetch-Dest": "document",
-                    "Sec-Fetch-Mode": "navigate",
-                    "Sec-Fetch-Site": "same-origin",
-                    "Sec-Fetch-User": "?1",
-                    "Upgrade-Insecure-Requests": "1",
-                    "Cookie": f"_neon_cms_session={cookieVal}"}
     connection: ConnectionCheck = ConnectionCheck(
         previous_connection, status, next_connection, of_the_show_name, interaction.user)
-    feedbackFrom.update(connection)
-    testFeedback = feedbackFrom.to_dict()
-    sentRequest = requests.post("https://www.relay.fm/shows/conduit/update?id=conduit",
-                                data=testFeedback, headers=header, cookies={"_neon_cms_session": cookieVal})
-    # a = sentRequest.prepare()
-    # with open("test.bin", "wb") as f:
-    #     f.write(sentRequest.content)
-    response = await interaction.edit_original_response(content=f":conduit: {str(connection)}")
-    if not sentRequest.ok:
+
+    form = WebForm("https://www.relay.fm/conduit/feedback", connection)
+
+    await form.update_bs_cookies()
+
+    success = await form.submit_form("https://www.relay.fm/shows/conduit/update?id=conduit")
+    response = await interaction.edit_original_response(content=f":Conduit: {str(connection)}")
+    if not success:
         raise RuntimeError("Couldnt be sent to feedback form")
     if isinstance(response, InteractionMessage):
         await response.add_reaction(thumbs_up)
