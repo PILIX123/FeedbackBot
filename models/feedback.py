@@ -108,7 +108,7 @@ class WebForm:
         await self._update_bs_cookies()
         self._generate_feedback_form()
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, data=self.feedbackForm.to_dict(), headers=self._generate_headers(), cookies=self._cookieVal) as r:
+            async with session.post(url, data=self._form.to_dict(), headers=self._generate_headers(), cookies=self._cookieVal) as r:
                 return r.ok
 
     async def _update_bs_cookies(self):
@@ -118,7 +118,7 @@ class WebForm:
                 self._info = BeautifulSoup(await r.text(), features="html.parser")
 
     def _generate_feedback_form(self):
-        self.feedbackForm = FeedbackForm()
+        self._form = FeedbackForm()
         form = self._info.find('form', id="edit_broadcast")
         if form is not None and isinstance(form, Tag):
             inputs = form.find_all("input")
@@ -126,15 +126,15 @@ class WebForm:
                 if isinstance(input, Tag) and isinstance(input.attrs.get("id"), str) and str(input.attrs.get("id")).startswith("broadcast_feedbacks_attribute"):
                     (num, field) = str(input.attrs.get("id")).removeprefix(
                         "broadcast_feedbacks_attributes_").split("_")
-                    self.feedbackForm.x = int(num)
-                    self.feedbackForm.__setattr__(field, str(
+                    self._form.x = int(num)
+                    self._form.__setattr__(field, str(
                         input.attrs.get("value") or ""))
                 if isinstance(input, Tag) and isinstance(input.attrs.get("tabindex"), str) and str(input.attrs.get("tabindex")) == "-1":
-                    self.feedbackForm.gibberish = str(input.attrs.get("id"))
+                    self._form.gibberish = str(input.attrs.get("id"))
                 if isinstance(input, Tag) and isinstance(input.attrs.get("name"), str) and str(input.attrs.get("name")) == "spinner" and isinstance(input.attrs.get("value"), str):
-                    self.feedbackForm.spinner = str(input.attrs.get("value"))
+                    self._form.spinner = str(input.attrs.get("value"))
 
-        self.feedbackForm.update(self._discordFeedback)
+        self._form.update(self._discordFeedback)
 
     def _generate_headers(self) -> dict[str, str]:
         tempmorsel = self._cookies.get("_neon_cms_session")
