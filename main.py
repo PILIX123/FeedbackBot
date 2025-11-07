@@ -7,6 +7,7 @@ from discord import (Activity, ActivityType, Client, Embed, Intents,
                      app_commands)
 from discord.app_commands import (AppCommandError, CommandInvokeError,
                                   CommandTree)
+from discord.utils import deprecated
 from dotenv import load_dotenv
 
 from models.feedback import ConnectionCheck, StJudeCall, WebForm
@@ -23,7 +24,8 @@ tree: CommandTree[Client] = app_commands.CommandTree(client)
 test: str = ":brook:1237150453691711590"
 thumbs_up: str = '👍'
 error_emote: str = "🚫"
-st_jude_emote: str = "stjude:739880520703541268"
+st_jude_emote: str = ":stjude:739880520703541268"
+conduit: str = ":Conduit:865262930610094100"
 admin_mods_perms = Permissions()
 admin_mods_perms.administrator = True
 admin_mods_perms.moderate_members = True
@@ -46,7 +48,7 @@ async def connection_check(interaction: Interaction, previous_connection: str, s
     await form.update_bs_cookies()
 
     success = await form.submit_form("https://www.relay.fm/shows/conduit/update?id=conduit")
-    response = await interaction.edit_original_response(content=f":Conduit: {str(connection)}")
+    response = await interaction.edit_original_response(content=f"{conduit} {str(connection)}")
     if not success:
         raise RuntimeError("Couldnt be sent to feedback form")
     if isinstance(response, InteractionMessage):
@@ -87,6 +89,7 @@ async def ask_upgrade(interaction: Interaction, question: str, anonymous: bool =
 @tree.command(name="set_embed_image", description="Sets this years image for the st-jude campain embed")
 @app_commands.default_permissions(admin_mods_perms)
 async def set_embed_url(interaction: Interaction, image_url: str):
+    # TODO: Make sure we save this into a mounted place so we can save the file path to a json
     global embed_url
     embed_url = image_url
     await interaction.response.send_message(f"This year's St. Jude embed image has been set to {image_url}")
@@ -94,7 +97,9 @@ async def set_embed_url(interaction: Interaction, image_url: str):
 
 @tree.command(name="set_st_jude_slug", description="Sets the st-jude event slug")
 # @app_commands.default_permissions(admin_mods_perms)
+@deprecated("this is not useful i just havent removed it yet")
 async def set_slug(interaction: Interaction, slug: str):
+    # FIX: REMOVE THIS ITS DEPRECATED
     global st_jude_slug
     st_jude_slug = slug
     await interaction.response.send_message(f"This year's st-jude event slug has been set to {slug}")
