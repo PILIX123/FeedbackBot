@@ -1,16 +1,9 @@
-from http import cookies
-from bs4.element import NavigableString, PageElement, Tag
-
-from discord import Member, Message, User
-from discord.channel import (DMChannel, GroupChannel, PartialMessageable,
-                             StageChannel, TextChannel, VoiceChannel)
-from discord.threads import Thread
-
-
-from bs4 import BeautifulSoup
-
 from http.cookies import SimpleCookie
+
 import aiohttp
+from bs4 import BeautifulSoup
+from bs4.element import Tag
+from discord import Member, User
 
 
 class DiscordFeedback:
@@ -29,8 +22,8 @@ class ConnectionCheck(DiscordFeedback):
     next_connection: str
     status: str
 
-    def __init__(self, previous_connection: str, status: str, next_connection: str, of_the_show: str | None, author: User | Member):
-        super().__init__(author)
+    def __init__(self, previous_connection: str, status: str, next_connection: str, of_the_show: str | None, author: User | Member, anon=True):
+        super().__init__(author, anon)
         self.next_connection = next_connection
         self.previous_connection = previous_connection
         self.status = status

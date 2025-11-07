@@ -2,16 +2,14 @@ import os
 from typing import Any
 
 import aiohttp
-import requests
 from discord import (Activity, ActivityType, Client, Embed, Intents,
                      Interaction, InteractionMessage, Permissions,
                      app_commands)
 from discord.app_commands import (AppCommandError, CommandInvokeError,
                                   CommandTree)
 from dotenv import load_dotenv
-from requests import Response
 
-from models.feedback import ConnectionCheck, FeedbackForm, StJudeCall, WebForm
+from models.feedback import ConnectionCheck, StJudeCall, WebForm
 from models.tiltify import FullCampaign
 from utils.utils import progressBar
 
@@ -83,7 +81,6 @@ async def on_error(interaction: Interaction, error: AppCommandError, /):
 
 @tree.command(name="ask_upgrade", description="Submit a question for Jason and Myke to maybe answer on the podcast")
 async def ask_upgrade(interaction: Interaction, question: str, anonymous: bool = False):
-    raise Exception("hi")
     await interaction.response.send_message(content=f"Question", ephemeral=anonymous)
 
 
