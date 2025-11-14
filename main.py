@@ -11,8 +11,8 @@ from discord.utils import deprecated
 from dotenv import load_dotenv
 
 from models.feedback import (AskUpgrade, BackstageQuestion, ConnectionCheck,
-                             DiscordFeedback, Question, SpotlightQuestion,
-                             StJudeCall, WebForm)
+                             DiscordFeedback, Question, SnellTalk,
+                             SpotlightQuestion, StJudeCall, WebForm)
 from models.tiltify import FullCampaign
 from utils.utils import CustomEmotes, progressBar
 
@@ -63,7 +63,7 @@ async def ask_backstage(interaction: Interaction, question: str):
     success = await form.submit_form(
         "https://www.relay.fm/shows/membership/update?id=membership")
 
-    response = await interaction.edit_original_response(content=question)
+    response = await interaction.edit_original_response(content=str(feedback))
     if not success:
         raise RuntimeError("Couldnt be sent to feedback form")
     if isinstance(response, InteractionMessage):
@@ -81,7 +81,7 @@ async def ask_spotlight(interaction: Interaction, question: str):
     success = await form.submit_form(
         "https://www.relay.fm/shows/membership/update?id=membership")
 
-    response = await interaction.edit_original_response(content=question)
+    response = await interaction.edit_original_response(content=str(feedback))
     if not success:
         raise RuntimeError("Couldnt be sent to feedback form")
     if isinstance(response, InteractionMessage):
@@ -89,7 +89,7 @@ async def ask_spotlight(interaction: Interaction, question: str):
         await response.add_reaction(test)
 
 
-@tree.command(name="ask_upgrade", description="Submit a question for Jason and Myke to maybe answer on the podcast")
+# @tree.command(name="ask_upgrade", description="Submit a question for Jason and Myke to maybe answer on the podcast")
 async def ask_upgrade(interaction: Interaction, question: str, anonymous: bool = False):
     await interaction.response.defer(ephemeral=anonymous)
 
@@ -100,11 +100,31 @@ async def ask_upgrade(interaction: Interaction, question: str, anonymous: bool =
         "https://www.relay.fm/shows/upgrade/update?id=upgrade")
 
     if anonymous and success:
-        await interaction.edit_original_response(content=f"You're question was sent to the feedback form anonymously")
-        return
+        return await interaction.edit_original_response(content=f"You're question was sent to the feedback form anonymously")
     elif anonymous and not success:
-        await interaction.edit_original_response(content=f"There was an error submitting your question to the feedback try again later")
-        return
+        return await interaction.edit_original_response(content=f"There was an error submitting your question to the feedback try again later")
+    if not success:
+        raise RuntimeError("Couldnt be sent to feedback form")
+    response = await interaction.edit_original_response(content=f"{str(feedback)}")
+    if isinstance(response, InteractionMessage):
+        await response.add_reaction(CustomEmotes.ThumbsUp.value)
+        await response.add_reaction(test)
+
+
+# @tree.command(name="snell_talk", description="Send in a question to open the show")
+async def snell_talk(interaction: Interaction, question: str, anonymous: bool = False):
+    await interaction.response.defer(ephemeral=anonymous)
+
+    feedback = SnellTalk(question, interaction.user, anonymous=anonymous)
+
+    form = WebForm("https://www.relay.fm/upgrade/feedback", feedback)
+    success = await form.submit_form(
+        "https://www.relay.fm/shows/upgrade/update?id=upgrade")
+
+    if anonymous and success:
+        return await interaction.edit_original_response(content=f"You're question was sent to the feedback form anonymously")
+    elif anonymous and not success:
+        return await interaction.edit_original_response(content=f"There was an error submitting your question to the feedback try again later")
     if not success:
         raise RuntimeError("Couldnt be sent to feedback form")
     response = await interaction.edit_original_response(content=f"{str(feedback)}")

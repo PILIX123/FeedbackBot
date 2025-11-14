@@ -34,33 +34,53 @@ class Question(DiscordFeedback):
         super().__init__(author, anonymous)
         self.question = question
 
+    def __str__(self) -> str:
+        return self.question
+
 
 class PerShow:
     per_show_value: PerShowValues
+    emote: CustomEmotes
 
 
 class BackstageQuestion(Question, PerShow):
     def __init__(self, question: str, author: User | Member, anonymous: bool = False) -> None:
         super().__init__(question, author, anonymous)
         self.per_show_value = PerShowValues.Backstage
+        self.emote = CustomEmotes.Backstage
+
+    def __str__(self) -> str:
+        return f"{self.emote.value} {super().__str__()}"
 
 
 class SpotlightQuestion(Question, PerShow):
     def __init__(self, question: str, author: User | Member, anonymous: bool = False) -> None:
         super().__init__(question, author, anonymous)
         self.per_show_value = PerShowValues.Spotlight
+        self.emote = CustomEmotes.Spotlight
+
+    def __str__(self) -> str:
+        return f"{self.emote.value} {super().__str__()}"
 
 
 class SnellTalk(Question, PerShow):
     def __init__(self, question: str, author: User | Member, anonymous: bool = False) -> None:
         super().__init__(question, author, anonymous)
         self.per_show_value = PerShowValues.SnellTalk
+        self.emote = CustomEmotes.Snell
+
+    def __str__(self) -> str:
+        return f"{self.emote.value} {super().__str__()}"
 
 
 class AskUpgrade(Question, PerShow):
     def __init__(self, question: str, author: User | Member, anonymous: bool = False) -> None:
         super().__init__(question, author, anonymous)
         self.per_show_value = PerShowValues.AskUpgrade
+        self.emote = CustomEmotes.Upgrade
+
+    def __str__(self) -> str:
+        return f"{self.emote.value} {super().__str__()}"
 
 
 class ConnectionCheck(DiscordFeedback):
