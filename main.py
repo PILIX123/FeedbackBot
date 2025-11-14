@@ -4,15 +4,13 @@ from typing import Any
 import aiohttp
 from discord import (Activity, ActivityType, Client, Embed, Intents,
                      Interaction, InteractionMessage, Permissions,
-                     app_commands, webhook)
+                     app_commands)
 from discord.app_commands import (AppCommandError, CommandInvokeError,
                                   CommandTree)
-from discord.utils import deprecated
 from dotenv import load_dotenv
 
 from models.feedback import (AskUpgrade, BackstageQuestion, ConnectionCheck,
-                             DiscordFeedback, Question, SnellTalk,
-                             SpotlightQuestion, StJudeCall, WebForm)
+                             SnellTalk, SpotlightQuestion, WebForm)
 from models.tiltify import FullCampaign
 from utils.utils import CustomEmotes, progressBar
 
@@ -27,7 +25,6 @@ test: str = ":brook:1237150453691711590"
 admin_mods_perms = Permissions()
 admin_mods_perms.administrator = True
 admin_mods_perms.moderate_members = True
-st_jude_slug: str = "relay-for-st-jude-2025"
 embed_url: str = "https://s3.amazonaws.com/relayfm/assets/Square-Campaign-URL-2025.png"
 client_id: str | None = os.getenv("tildify_client_id")
 client_secret: str | None = os.getenv("tildify_client_secret")
@@ -158,21 +155,12 @@ async def set_embed_url(interaction: Interaction, image_url: str):
     await interaction.response.send_message(f"This year's St. Jude embed image has been set to {image_url}")
 
 
-@tree.command(name="set_st_jude_slug", description="Sets the st-jude event slug")
-# @app_commands.default_permissions(admin_mods_perms)
-async def set_slug(interaction: Interaction, slug: str):
-    # FIX: REMOVE THIS ITS DEPRECATED
-    global st_jude_slug
-    st_jude_slug = slug
-    await interaction.response.send_message(f"This year's st-jude event slug has been set to {slug}")
-
-
+# TODO: Maybe move some of this logic into the FullCampaign class
 @tree.command(name="donate", description="Donate to St-Jude")
 # @app_commands.default_permissions(admin_mods_perms)
 async def donate(interaction: Interaction):
     await interaction.response.defer()
     headers = {"Content-Type": "application/json"}
-    call = StJudeCall(st_jude_slug)
 
     info: dict
     campain: FullCampaign

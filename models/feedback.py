@@ -101,28 +101,6 @@ class ConnectionCheck(DiscordFeedback):
         return f"{CustomEmotes.Conduit.value} Connection Check: {self.status} {self.previous_connection}\n\nNew Connection: {self.next_connection}"
 
 
-class StJudeVariables:
-    vanity = "+relay-for-st-jude"
-    slug: str
-
-    def __init__(self, slug: str):
-        self.slug = slug
-
-
-class StJudeCall:
-    operationName: str = "get_team_event_by_vanity_and_slug"
-    variables: StJudeVariables
-    query: str = "query get_team_event_by_vanity_and_slug($vanity: String!, $slug: String!) {teamEvent(vanity: $vanity, slug: $slug) {totalAmountRaised {currency value} goal {currency value}}}"
-    embed_image_url: str
-
-    def __init__(self, slug: str):
-        self.variables = StJudeVariables(slug)
-
-    def toDict(self):
-        return {'operationName': self.operationName, 'variables': {
-            'vanity': self.variables.vanity, 'slug': self.variables.slug}, 'query': self.query}
-
-
 class FeedbackForm:
     utf8: str = "✓"
     _method: str = "put"
