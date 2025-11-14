@@ -10,7 +10,9 @@ from discord.app_commands import (AppCommandError, CommandInvokeError,
 from discord.utils import deprecated
 from dotenv import load_dotenv
 
-from models.feedback import ConnectionCheck, StJudeCall, WebForm
+from models.feedback import (BackstageQuestion, ConnectionCheck,
+                             DiscordFeedback, Question, SpotlightQuestion,
+                             StJudeCall, WebForm)
 from models.tiltify import FullCampaign
 from utils.utils import progressBar
 
@@ -22,14 +24,19 @@ client: Client = Client(intents=intents)
 tree: CommandTree[Client] = app_commands.CommandTree(client)
 
 test: str = ":brook:1237150453691711590"
-thumbs_up: str = '👍'
+thumbs_up: str = "👍"
 error_emote: str = "🚫"
 st_jude_emote: str = ":stjude:739880520703541268"
 conduit: str = ":Conduit:865262930610094100"
+six_heart: str = ":sixheart:744708453951602710"
+spotlight: str = ":Spotlight:1009268522414772284"
+backstage: str = ":Backstage:13342787605847122"
+snell: str = ":snell:823597034485317682"
+upgrade: str = ":Upgrade:124250265317147035"
 admin_mods_perms = Permissions()
 admin_mods_perms.administrator = True
 admin_mods_perms.moderate_members = True
-st_jude_slug: str = 'relay-for-st-jude-2025'
+st_jude_slug: str = "relay-for-st-jude-2025"
 embed_url: str = "https://s3.amazonaws.com/relayfm/assets/Square-Campaign-URL-2025.png"
 client_id: str | None = os.getenv("tildify_client_id")
 client_secret: str | None = os.getenv("tildify_client_secret")
@@ -55,12 +62,21 @@ async def connection_check(interaction: Interaction, previous_connection: str, s
 
 
 @tree.command(name="ask_backstage", description="Ask a question for the beards")
-async def backstage(interaction: Interaction, question: str):
-    response = await interaction.response.send_message(question)
-    if isinstance(response.resource, InteractionMessage):
-        await response.resource.add_reaction(thumbs_up)
-        await response.resource.add_reaction(test)
-    # TODO Add to form
+async def ask_backstage(interaction: Interaction, question: str):
+    await interaction.response.defer()
+
+    feedback = SpotlightQuestion(question, interaction.user)
+
+    form = WebForm("https://www.relay.fm/membership/feedback", feedback)
+    success = form.submit_form(
+        "https://www.relay.fm/shows/membership/update?id=membership")
+
+    response = await interaction.edit_original_response(content=question)
+    if not success:
+        raise RuntimeError("Couldnt be sent to feedback form")
+    if isinstance(response, InteractionMessage):
+        await response.add_reaction(thumbs_up)
+        await response.add_reaction(test)
 
 
 @tree.error
@@ -107,15 +123,18 @@ async def set_slug(interaction: Interaction, slug: str):
 # @app_commands.default_permissions(admin_mods_perms)
 async def donate(interaction: Interaction):
     await interaction.response.defer()
-    headers = {"Content-Type": "application/json",
-               }
+    headers = {"Content-Type": "application/json"}
     call = StJudeCall(st_jude_slug)
 
     info: dict
     campain: FullCampaign
     async with aiohttp.ClientSession() as session:
-        data: dict = {"client_id": f"{client_id}", "client_secret": f"{client_secret}",
-                      "grant_type": "client_credentials", "scope": "public"}
+        data: dict = {
+            "client_id": f"{client_id}",
+            "client_secret": f"{client_secret}",
+            "grant_type": "client_credentials",
+            "scope": "public",
+        }
         async with session.post(f"https://v5api.tiltify.com/oauth/token", json=data, headers=headers) as r:
             info = await r.json()
             headers.update(
@@ -135,16 +154,16 @@ async def donate(interaction: Interaction):
         title="Donate to St. Jude!",
         url="https://www.stjude.org/relay",
         description="St. Jude Children's Research Hospital treats the toughest childhood cancers and deserves your money! https://www.stjude.org/relay",
-        color=0xffcc33
+        color=0xFFCC33,
     )
-    embed.set_thumbnail(
-        url=embed_url)
+    embed.set_thumbnail(url=embed_url)
     embed.add_field(name="Currently Raised:",
                     value=f"${raised:,.2f}", inline=False)
     embed.add_field(name="Fundraising Target:",
                     value=f"${goal:,.2f}", inline=False)
-    embed.add_field(name="Progress:",
-                    value=f"{round(raised/goal*100, 2)}%", inline=False)
+    embed.add_field(
+        name="Progress:", value=f"{round(raised/goal*100, 2)}%", inline=False
+    )
     embed.set_footer(text=progressBar(raised, goal))
     mess = await interaction.edit_original_response(content="<https://www.stjude.org/relay>", embed=embed)
     if isinstance(mess, InteractionMessage):

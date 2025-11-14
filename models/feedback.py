@@ -1,9 +1,19 @@
+from enum import Enum
 from http.cookies import SimpleCookie
 
 import aiohttp
 from bs4 import BeautifulSoup
 from bs4.element import Tag
 from discord import Member, User
+
+
+class PerShowValues(Enum):
+    Backstage = "Backstage"
+    Spotlight = "Spotlight"
+    AskUpgrade = "Ask Upgrade"
+    SnellTalk = "Snell Talk"
+    # TODO: Make sure this one has a way to be differenciated by show
+    FollowUp = "Follow Up"
 
 
 class DiscordFeedback:
@@ -15,8 +25,31 @@ class DiscordFeedback:
         self.anon = anonymous
 
 
+class Question(DiscordFeedback):
+    question: str
+
+    def __init__(self, question: str, author: User | Member, anonymous: bool = False) -> None:
+        super().__init__(author, anonymous)
+        self.question = question
+
+
+class PerShow:
+    per_show_value: PerShowValues
+
+
+class BackstageQuestion(Question, PerShow):
+    def __init__(self, question: str, author: User | Member, anonymous: bool = False) -> None:
+        super().__init__(question, author, anonymous)
+        self.per_show_value = PerShowValues.Backstage
+
+
+class SpotlightQuestion(Question, PerShow):
+    def __init__(self, question: str, author: User | Member, anonymous: bool = False) -> None:
+        super().__init__(question, author, anonymous)
+        self.per_show_value = PerShowValues.Spotlight
+
+
 class ConnectionCheck(DiscordFeedback):
-    author: User | Member
     of_the_show: str
     previous_connection: str
     next_connection: str
@@ -69,11 +102,14 @@ class FeedbackForm:
     gibberish: str
     spinner: str
     commit: str = "Submit"
+    per_show_tag: str | None = None
 
     def update(self, feedback: DiscordFeedback) -> None:
         self.name = feedback.author.name
         self.text = str(feedback)
         self.anonymous = "1" if feedback.anon else "0"
+        if isinstance(feedback, PerShow):
+            self.per_show_tag = feedback.per_show_value.value
 
     def to_dict(self) -> dict:
         payload: dict = dict()
@@ -86,6 +122,9 @@ class FeedbackForm:
         payload.update({f"{broadcastStr}[text]": self.text})
         payload.update({f"{broadcastStr}[anonymous]": self.anonymous})
         payload.update({f"{broadcastStr}[archived]": self.archived})
+        if self.per_show_tag is not None:
+            payload.update(
+                {f"{broadcastStr}[per_show_tag]": self.per_show_tag})
         payload.update({f"{self.gibberish}": ""})
         payload.update({"spinner": self.spinner})
         payload.update({"commit": self.commit})
@@ -123,15 +162,18 @@ class WebForm:
         if form is not None and isinstance(form, Tag):
             inputs = form.find_all("input")
             for input in inputs:
-                if isinstance(input, Tag) and isinstance(input.attrs.get("id"), str) and str(input.attrs.get("id")).startswith("broadcast_feedbacks_attribute"):
+                if isinstance(input, Tag) and isinstance(input.attrs.get("id"), str) \
+                        and str(input.attrs.get("id")).startswith("broadcast_feedbacks_attribute"):
                     (num, field) = str(input.attrs.get("id")).removeprefix(
                         "broadcast_feedbacks_attributes_").split("_")
                     self._form.x = int(num)
                     self._form.__setattr__(field, str(
                         input.attrs.get("value") or ""))
-                if isinstance(input, Tag) and isinstance(input.attrs.get("tabindex"), str) and str(input.attrs.get("tabindex")) == "-1":
+                if isinstance(input, Tag) and isinstance(input.attrs.get("tabindex"), str) \
+                        and str(input.attrs.get("tabindex")) == "-1":
                     self._form.gibberish = str(input.attrs.get("id"))
-                if isinstance(input, Tag) and isinstance(input.attrs.get("name"), str) and str(input.attrs.get("name")) == "spinner" and isinstance(input.attrs.get("value"), str):
+                if isinstance(input, Tag) and isinstance(input.attrs.get("name"), str) \
+                        and str(input.attrs.get("name")) == "spinner" and isinstance(input.attrs.get("value"), str):
                     self._form.spinner = str(input.attrs.get("value"))
 
         self._form.update(self._discordFeedback)
