@@ -111,7 +111,6 @@ async def set_embed_url(interaction: Interaction, image_url: str):
 
 @tree.command(name="set_st_jude_slug", description="Sets the st-jude event slug")
 # @app_commands.default_permissions(admin_mods_perms)
-@deprecated("this is not useful i just havent removed it yet")
 async def set_slug(interaction: Interaction, slug: str):
     # FIX: REMOVE THIS ITS DEPRECATED
     global st_jude_slug
