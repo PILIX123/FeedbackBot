@@ -4,17 +4,17 @@ from typing import Any
 import aiohttp
 from discord import (Activity, ActivityType, Client, Embed, Intents,
                      Interaction, InteractionMessage, Permissions,
-                     app_commands)
+                     app_commands, webhook)
 from discord.app_commands import (AppCommandError, CommandInvokeError,
                                   CommandTree)
 from discord.utils import deprecated
 from dotenv import load_dotenv
 
-from models.feedback import (BackstageQuestion, ConnectionCheck,
+from models.feedback import (AskUpgrade, BackstageQuestion, ConnectionCheck,
                              DiscordFeedback, Question, SpotlightQuestion,
                              StJudeCall, WebForm)
 from models.tiltify import FullCampaign
-from utils.utils import progressBar
+from utils.utils import CustomEmotes, progressBar
 
 load_dotenv()
 intents: Intents = Intents.default()
@@ -24,15 +24,6 @@ client: Client = Client(intents=intents)
 tree: CommandTree[Client] = app_commands.CommandTree(client)
 
 test: str = ":brook:1237150453691711590"
-thumbs_up: str = "👍"
-error_emote: str = "🚫"
-st_jude_emote: str = ":stjude:739880520703541268"
-conduit: str = ":Conduit:865262930610094100"
-six_heart: str = ":sixheart:744708453951602710"
-spotlight: str = ":Spotlight:1009268522414772284"
-backstage: str = ":Backstage:13342787605847122"
-snell: str = ":snell:823597034485317682"
-upgrade: str = ":Upgrade:124250265317147035"
 admin_mods_perms = Permissions()
 admin_mods_perms.administrator = True
 admin_mods_perms.moderate_members = True
@@ -53,11 +44,11 @@ async def connection_check(interaction: Interaction, previous_connection: str, s
     form = WebForm("https://www.relay.fm/conduit/feedback", connection)
     success = await form.submit_form("https://www.relay.fm/shows/conduit/update?id=conduit")
 
-    response = await interaction.edit_original_response(content=f"{conduit} {str(connection)}")
+    response = await interaction.edit_original_response(content=f"{str(connection)}")
     if not success:
         raise RuntimeError("Couldnt be sent to feedback form")
     if isinstance(response, InteractionMessage):
-        await response.add_reaction(thumbs_up)
+        await response.add_reaction(CustomEmotes.ThumbsUp.value)
         await response.add_reaction(test)
 
 
@@ -65,17 +56,60 @@ async def connection_check(interaction: Interaction, previous_connection: str, s
 async def ask_backstage(interaction: Interaction, question: str):
     await interaction.response.defer()
 
+    # TODO: Change this back to bacckstage after testing
     feedback = SpotlightQuestion(question, interaction.user)
 
     form = WebForm("https://www.relay.fm/membership/feedback", feedback)
-    success = form.submit_form(
+    success = await form.submit_form(
         "https://www.relay.fm/shows/membership/update?id=membership")
 
     response = await interaction.edit_original_response(content=question)
     if not success:
         raise RuntimeError("Couldnt be sent to feedback form")
     if isinstance(response, InteractionMessage):
-        await response.add_reaction(thumbs_up)
+        await response.add_reaction(CustomEmotes.ThumbsUp.value)
+        await response.add_reaction(test)
+
+
+@tree.command(name="ask_spotlight", description="Ask a question for the relay host/friend")
+async def ask_spotlight(interaction: Interaction, question: str):
+    await interaction.response.defer()
+
+    feedback = SpotlightQuestion(question, interaction.user)
+
+    form = WebForm("https://www.relay.fm/membership/feedback", feedback)
+    success = await form.submit_form(
+        "https://www.relay.fm/shows/membership/update?id=membership")
+
+    response = await interaction.edit_original_response(content=question)
+    if not success:
+        raise RuntimeError("Couldnt be sent to feedback form")
+    if isinstance(response, InteractionMessage):
+        await response.add_reaction(CustomEmotes.ThumbsUp.value)
+        await response.add_reaction(test)
+
+
+@tree.command(name="ask_upgrade", description="Submit a question for Jason and Myke to maybe answer on the podcast")
+async def ask_upgrade(interaction: Interaction, question: str, anonymous: bool = False):
+    await interaction.response.defer(ephemeral=anonymous)
+
+    feedback = AskUpgrade(question, interaction.user, anonymous=anonymous)
+
+    form = WebForm("https://www.relay.fm/upgrade/feedback", feedback)
+    success = await form.submit_form(
+        "https://www.relay.fm/shows/upgrade/update?id=upgrade")
+
+    if anonymous and success:
+        await interaction.edit_original_response(content=f"You're question was sent to the feedback form anonymously")
+        return
+    elif anonymous and not success:
+        await interaction.edit_original_response(content=f"There was an error submitting your question to the feedback try again later")
+        return
+    if not success:
+        raise RuntimeError("Couldnt be sent to feedback form")
+    response = await interaction.edit_original_response(content=f"{str(feedback)}")
+    if isinstance(response, InteractionMessage):
+        await response.add_reaction(CustomEmotes.ThumbsUp.value)
         await response.add_reaction(test)
 
 
@@ -87,17 +121,12 @@ async def on_error(interaction: Interaction, error: AppCommandError, /):
         error.original
     if interaction.response.is_done():
         mess = await interaction.original_response()
-        await mess.add_reaction(error_emote)
+        await mess.add_reaction(CustomEmotes.Error.value)
     else:
         if interaction.command is not None:
             await interaction.response.send_message(f"There was an error executing the {interaction.command.qualified_name} command")
         else:
             await interaction.response.send_message("There was an error with the interaction")
-
-
-@tree.command(name="ask_upgrade", description="Submit a question for Jason and Myke to maybe answer on the podcast")
-async def ask_upgrade(interaction: Interaction, question: str, anonymous: bool = False):
-    await interaction.response.send_message(content=f"Question", ephemeral=anonymous)
 
 
 @tree.command(name="set_embed_image", description="Sets this years image for the st-jude campain embed")

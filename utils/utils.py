@@ -1,4 +1,19 @@
 
+from enum import Enum
+
+
+class CustomEmotes(Enum):
+    Conduit = ":Conduit:865262930610094100"
+    SixHeart = ":sixheart:744708453951602710"
+    Spotlight = ":Spotlight:1009268522414772284"
+    Backstage = ":Backstage:13342787605847122"
+    Snell = ":snell:823597034485317682"
+    Upgrade = ":Upgrade:124250265317147035"
+    StJude = ":stjude:739880520703541268"
+    ThumbsUp = "👍"
+    Error = "🚫"
+
+
 def progressBar(raised: float, goal: float):
     progress_full: str = "🟩"
     progress_empty: str = "⬜"

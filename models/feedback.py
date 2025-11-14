@@ -6,6 +6,8 @@ from bs4 import BeautifulSoup
 from bs4.element import Tag
 from discord import Member, User
 
+from utils.utils import CustomEmotes
+
 
 class PerShowValues(Enum):
     Backstage = "Backstage"
@@ -49,6 +51,18 @@ class SpotlightQuestion(Question, PerShow):
         self.per_show_value = PerShowValues.Spotlight
 
 
+class SnellTalk(Question, PerShow):
+    def __init__(self, question: str, author: User | Member, anonymous: bool = False) -> None:
+        super().__init__(question, author, anonymous)
+        self.per_show_value = PerShowValues.SnellTalk
+
+
+class AskUpgrade(Question, PerShow):
+    def __init__(self, question: str, author: User | Member, anonymous: bool = False) -> None:
+        super().__init__(question, author, anonymous)
+        self.per_show_value = PerShowValues.AskUpgrade
+
+
 class ConnectionCheck(DiscordFeedback):
     of_the_show: str
     previous_connection: str
@@ -64,7 +78,7 @@ class ConnectionCheck(DiscordFeedback):
             self.of_the_show = of_the_show
 
     def __str__(self) -> str:
-        return f"Connection Check: {self.status} {self.previous_connection}\n\nNew Connection: {self.next_connection}"
+        return f"{CustomEmotes.Conduit.value} Connection Check: {self.status} {self.previous_connection}\n\nNew Connection: {self.next_connection}"
 
 
 class StJudeVariables:
