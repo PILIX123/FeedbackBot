@@ -1,18 +1,15 @@
 import os
-from typing import Any
 
-import aiohttp
-from discord import (Activity, ActivityType, Client, Embed, Intents,
-                     Interaction, InteractionMessage, Permissions,
-                     app_commands)
+from discord import (Activity, ActivityType, Client, Intents, Interaction,
+                     InteractionMessage, Permissions, app_commands)
 from discord.app_commands import (AppCommandError, CommandInvokeError,
                                   CommandTree)
 from dotenv import load_dotenv
 
 from models.feedback import (AskUpgrade, BackstageQuestion, ConnectionCheck,
                              SnellTalk, SpotlightQuestion, WebForm)
-from models.tiltify import FullCampaign
-from utils.utils import CustomEmotes, progressBar
+from models.tiltify import FullCampaign, generate_tiltify_campain
+from utils.utils import CustomEmotes
 
 load_dotenv()
 intents: Intents = Intents.default()
@@ -26,9 +23,6 @@ admin_mods_perms = Permissions()
 admin_mods_perms.administrator = True
 admin_mods_perms.moderate_members = True
 embed_url: str = "https://s3.amazonaws.com/relayfm/assets/Square-Campaign-URL-2025.png"
-client_id: str | None = os.getenv("tildify_client_id")
-client_secret: str | None = os.getenv("tildify_client_secret")
-fundraising_id: str | None = os.getenv("fundraising_id")
 
 
 @tree.command(name="connection_check", description="Log a connection check for the conduit podcast")
@@ -155,52 +149,13 @@ async def set_embed_url(interaction: Interaction, image_url: str):
     await interaction.response.send_message(f"This year's St. Jude embed image has been set to {image_url}")
 
 
-# TODO: Maybe move some of this logic into the FullCampaign class
 @tree.command(name="donate", description="Donate to St-Jude")
 # @app_commands.default_permissions(admin_mods_perms)
 async def donate(interaction: Interaction):
     await interaction.response.defer()
-    headers = {"Content-Type": "application/json"}
 
-    info: dict
-    campain: FullCampaign
-    async with aiohttp.ClientSession() as session:
-        data: dict = {
-            "client_id": f"{client_id}",
-            "client_secret": f"{client_secret}",
-            "grant_type": "client_credentials",
-            "scope": "public",
-        }
-        async with session.post(f"https://v5api.tiltify.com/oauth/token", json=data, headers=headers) as r:
-            info = await r.json()
-            headers.update(
-                {"Authorization": f"Bearer {info.get("access_token")}"})
-        async with session.get(f"https://v5api.tiltify.com/api/public/fundraising_events/{fundraising_id}",
-                               headers=headers) as r:
-            data = await r.json()
-            if data.get("data") is not None:
-                actual_data: dict[Any, Any] = data.get("data")  # type:ignore
-                campain = FullCampaign(**actual_data)
-            else:
-                raise Exception("Campain info wasnt querried properly")
-
-    raised: float = float(campain.total_amount_raised.value)
-    goal: float = float(campain.goal.value)
-    embed = Embed(
-        title="Donate to St. Jude!",
-        url="https://www.stjude.org/relay",
-        description="St. Jude Children's Research Hospital treats the toughest childhood cancers and deserves your money! https://www.stjude.org/relay",
-        color=0xFFCC33,
-    )
-    embed.set_thumbnail(url=embed_url)
-    embed.add_field(name="Currently Raised:",
-                    value=f"${raised:,.2f}", inline=False)
-    embed.add_field(name="Fundraising Target:",
-                    value=f"${goal:,.2f}", inline=False)
-    embed.add_field(
-        name="Progress:", value=f"{round(raised/goal*100, 2)}%", inline=False
-    )
-    embed.set_footer(text=progressBar(raised, goal))
+    campain: FullCampaign = await generate_tiltify_campain()
+    embed = campain.generate_embed(embed_url)
     mess = await interaction.edit_original_response(content="<https://www.stjude.org/relay>", embed=embed)
     if isinstance(mess, InteractionMessage):
         await mess.add_reaction(test)
