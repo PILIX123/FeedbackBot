@@ -18,7 +18,6 @@ intents.message_content = True
 client: Client = Client(intents=intents)
 tree: CommandTree[Client] = app_commands.CommandTree(client)
 
-test: str = ":brook:1237150453691711590"
 admin_mods_perms = Permissions()
 admin_mods_perms.administrator = True
 admin_mods_perms.moderate_members = True
@@ -40,15 +39,14 @@ async def connection_check(interaction: Interaction, previous_connection: str, s
         raise RuntimeError("Couldnt be sent to feedback form")
     if isinstance(response, InteractionMessage):
         await response.add_reaction(CustomEmotes.ThumbsUp.value)
-        await response.add_reaction(test)
+        await response.add_reaction(CustomEmotes.Conduit.value)
 
 
 @tree.command(name="ask_backstage", description="Ask a question for the beards")
 async def ask_backstage(interaction: Interaction, question: str):
     await interaction.response.defer()
 
-    # TODO: Change this back to bacckstage after testing
-    feedback = SpotlightQuestion(question, interaction.user)
+    feedback = BackstageQuestion(question, interaction.user)
 
     form = WebForm("https://www.relay.fm/membership/feedback", feedback)
     success = await form.submit_form(
@@ -59,7 +57,7 @@ async def ask_backstage(interaction: Interaction, question: str):
         raise RuntimeError("Couldnt be sent to feedback form")
     if isinstance(response, InteractionMessage):
         await response.add_reaction(CustomEmotes.ThumbsUp.value)
-        await response.add_reaction(test)
+        await response.add_reaction(CustomEmotes.Backstage.value)
 
 
 @tree.command(name="ask_spotlight", description="Ask a question for the relay host/friend")
@@ -77,7 +75,7 @@ async def ask_spotlight(interaction: Interaction, question: str):
         raise RuntimeError("Couldnt be sent to feedback form")
     if isinstance(response, InteractionMessage):
         await response.add_reaction(CustomEmotes.ThumbsUp.value)
-        await response.add_reaction(test)
+        await response.add_reaction(CustomEmotes.Spotlight.value)
 
 
 # @tree.command(name="ask_upgrade", description="Submit a question for Jason and Myke to maybe answer on the podcast")
@@ -99,7 +97,7 @@ async def ask_upgrade(interaction: Interaction, question: str, anonymous: bool =
     response = await interaction.edit_original_response(content=f"{str(feedback)}")
     if isinstance(response, InteractionMessage):
         await response.add_reaction(CustomEmotes.ThumbsUp.value)
-        await response.add_reaction(test)
+        await response.add_reaction(CustomEmotes.Upgrade.value)
 
 
 # @tree.command(name="snell_talk", description="Send in a question to open the show")
@@ -121,7 +119,7 @@ async def snell_talk(interaction: Interaction, question: str, anonymous: bool = 
     response = await interaction.edit_original_response(content=f"{str(feedback)}")
     if isinstance(response, InteractionMessage):
         await response.add_reaction(CustomEmotes.ThumbsUp.value)
-        await response.add_reaction(test)
+        await response.add_reaction(CustomEmotes.Snell.value)
 
 
 @tree.error
@@ -130,6 +128,8 @@ async def on_error(interaction: Interaction, error: AppCommandError, /):
         # TODO Add logger
         error.command.qualified_name
         error.original
+        print(error.command.qualified_name)
+        print(error.original)
     if interaction.response.is_done():
         mess = await interaction.original_response()
         await mess.add_reaction(CustomEmotes.Error.value)
@@ -140,8 +140,6 @@ async def on_error(interaction: Interaction, error: AppCommandError, /):
             await interaction.response.send_message("There was an error with the interaction")
 
 
-@tree.command(name="set_embed_image", description="Sets this years image for the st-jude campain embed")
-@app_commands.default_permissions(admin_mods_perms)
 async def set_embed_url(interaction: Interaction, image_url: str):
     # TODO: Make sure we save this into a mounted place so we can save the file path to a json
     global embed_url
@@ -150,7 +148,7 @@ async def set_embed_url(interaction: Interaction, image_url: str):
 
 
 @tree.command(name="donate", description="Donate to St-Jude")
-# @app_commands.default_permissions(admin_mods_perms)
+@app_commands.default_permissions(admin_mods_perms)
 async def donate(interaction: Interaction):
     await interaction.response.defer()
 
@@ -158,7 +156,7 @@ async def donate(interaction: Interaction):
     embed = campain.generate_embed(embed_url)
     mess = await interaction.edit_original_response(content="<https://www.stjude.org/relay>", embed=embed)
     if isinstance(mess, InteractionMessage):
-        await mess.add_reaction(test)
+        await mess.add_reaction(CustomEmotes.StJude.value)
 
 
 @client.event
